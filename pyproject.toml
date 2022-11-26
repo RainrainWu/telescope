@@ -1,0 +1,49 @@
+[tool.poetry]
+name = "unit-testing-lab"
+version = "0.1.0"
+description = ""
+authors = ["Rain Wu <rain.wu@appier.com>"]
+readme = "README.md"
+packages = [{include = "unit_testing_lab"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+psycopg2 = "^2.9.3"
+SQLAlchemy = "^1.4.39"
+pydantic = "^1.9.1"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.1.2"
+pytest-xdist = "^2.5.0"
+black = "^22.6.0"
+isort = "^5.10.1"
+moto = "^3.1.16"
+testcontainers = {version = "^3.6.0", extras = ["postgres"]}
+hypothesis = "^6.54.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target_version = ['py310']
+include = '\.pyi?$'
+
+[tool.isort]
+line_length = 88
+indent = '    '
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+src_paths = ['tests']
+
+[tool.pytest.ini_options]
+minversion = '7.0'
+testpaths = [
+    "tests",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
