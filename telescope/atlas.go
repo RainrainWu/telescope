@@ -18,9 +18,24 @@ const (
 	PYTHON
 )
 
+type OutdatedScope int
+
+const (
+	MAJOR OutdatedScope = iota
+	MINOR
+	PATCH
+	UP_TO_DATE
+)
+
+type IReportable interface {
+	queryVersionsInformation()
+	ReportOutdated(scope OutdatedScope)
+}
+
 type Atlas struct {
 	name         string
-	dependencies []*Dependency
+	language     Language
+	dependencies []IDependable
 }
 
 type PoetryLockPackage struct {
@@ -33,22 +48,36 @@ type PoetryLock struct {
 	Packages []PoetryLockPackage `toml:"package"`
 }
 
-func NewAtlas(filePath string) Atlas {
+func NewAtlas(filePath string) IReportable {
+
+	var atlas IReportable
+
+	fileBytes := parseDependenciesFile(filePath)
+
+	switch filePath {
+	case "go.mod":
+		atlas = buildAtlasGoMod(fileBytes)
+	case "poetry.lock":
+		atlas = buildAtlasPoetryLock(fileBytes)
+	default:
+		panic(errors.New(fmt.Sprintf("unknown dep file type: %s", filePath)))
+	}
+	atlas.queryVersionsInformation()
+	return atlas
+}
+
+func parseDependenciesFile(filePath string) []byte {
 
 	fileBytes, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		logrus.Fatal(err.Error())
+		panic(errors.New(fmt.Sprintf("failed to read dep file %s", filePath)))
 	}
 
-	if filePath == "go.mod" {
-		return ParseAtlasGoMod(fileBytes)
-	} else if filePath == "poetry.lock" {
-		return ParseAtlasPoetryLock(fileBytes)
-	}
-	panic(errors.New("unknown file type"))
+	return fileBytes
 }
 
-func ParseAtlasGoMod(fileBytes []byte) Atlas {
+func buildAtlasGoMod(fileBytes []byte) IReportable {
 
 	modObject, err := modfile.Parse("go.mod", fileBytes, nil)
 	if err != nil {
@@ -57,65 +86,72 @@ func ParseAtlasGoMod(fileBytes []byte) Atlas {
 
 	atlas := Atlas{
 		name:         modObject.Module.Mod.Path,
-		dependencies: []*Dependency{},
+		language:     GO,
+		dependencies: []IDependable{},
 	}
 	for _, require := range modObject.Require {
 		if require.Indirect {
 			continue
 		}
-		atlas.dependencies = append(
-			atlas.dependencies,
-			NewDependency(require.Mod.Path, require.Mod.Version, GO),
-		)
+		atlas.appendDependency(NewDependency(require.Mod.Path, require.Mod.Version))
 	}
-	return atlas
+	return &atlas
 }
 
-func ParseAtlasPoetryLock(fileBytes []byte) Atlas {
+func buildAtlasPoetryLock(fileBytes []byte) IReportable {
 
 	var poetryLock PoetryLock
 	toml.Unmarshal(fileBytes, &poetryLock)
 
 	atlas := Atlas{
 		name:         "",
-		dependencies: []*Dependency{},
+		language:     PYTHON,
+		dependencies: []IDependable{},
 	}
 	for _, pkg := range poetryLock.Packages {
 		if pkg.Category != "main" {
 			continue
 		}
-		fmt.Println(pkg.Name, pkg.Version)
-		atlas.dependencies = append(
-			atlas.dependencies,
-			NewDependency(pkg.Name, pkg.Version, PYTHON),
-		)
+		atlas.appendDependency(NewDependency(pkg.Name, pkg.Version))
 	}
-	return atlas
+	return &atlas
 }
 
-func (a *Atlas) Query() {
+func (a *Atlas) appendDependency(dep IDependable) {
+
+	a.dependencies = append(a.dependencies, dep)
+}
+
+func (a *Atlas) queryVersionsInformation() {
 
 	queryWaitGroup := new(sync.WaitGroup)
 
 	queryWaitGroup.Add(len(a.dependencies))
 	for _, dep := range a.dependencies {
-		go dep.QueryVersionsPython(queryWaitGroup)
+		go dep.QueryReleaseVersions(a.language, queryWaitGroup)
 	}
 	queryWaitGroup.Wait()
 }
 
-func (a *Atlas) Report() {
+func (a *Atlas) ReportOutdated(scope OutdatedScope) {
+
+	outdatedMap := map[OutdatedScope][]IDependable{
+		MAJOR: []IDependable{},
+		MINOR: []IDependable{},
+		PATCH: []IDependable{},
+		UP_TO_DATE: []IDependable{},
+	}
 
 	for _, dep := range a.dependencies {
-		fmt.Println(dep.Name)
-		dep.Report()
+		depOutdatedScope := dep.(*Dependency).GetOutdatedScope()
+		outdatedMap[depOutdatedScope] = append(outdatedMap[depOutdatedScope], dep)
 	}
-}
-
-func (a *Atlas) HandleError(err error) {
-
-	if err == nil {
-		return
+	for scp, deps := range outdatedMap {
+		if scp > scope {
+			continue
+		}
+		for _, dep := range deps {
+			fmt.Println(dep.(*Dependency).Name, dep.(*Dependency).VersionCurrent, dep.(*Dependency).VersionLatest)
+		}
 	}
-	logrus.Fatal(err.Error())
 }

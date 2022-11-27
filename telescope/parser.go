@@ -2,6 +2,7 @@ package telescope
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,17 +12,18 @@ import (
 
 	"github.com/Masterminds/semver"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/mod/module"
 )
-
-type SemVerScope int
 
 const (
-	proxyUrlGoModule                  = "https://proxy.golang.org/%s/@v/list"
-	proxyUrlPythonPackage             = "https://pypi.org/pypi/%s/json"
-	MAJOR                 SemVerScope = iota
-	MINOR
-	PATCH
+	proxyUrlGoModule      = "https://proxy.golang.org/%s/@v/list"
+	proxyUrlPythonPackage = "https://pypi.org/pypi/%s/json"
 )
+
+type IDependable interface {
+	QueryReleaseVersions(language Language, wg *sync.WaitGroup)
+	GetOutdatedScope() OutdatedScope
+}
 
 type Dependency struct {
 	Name           string
@@ -33,7 +35,7 @@ type PypiJson struct {
 	Releases map[string]struct{} `json:"releases"`
 }
 
-func NewDependency(name, version string, language Language) *Dependency {
+func NewDependency(name, version string) IDependable {
 
 	versionCurrent, err := semver.NewVersion(version)
 	if err != nil {
@@ -48,92 +50,101 @@ func NewDependency(name, version string, language Language) *Dependency {
 	}
 }
 
-func (d *Dependency) QueryVersionsGo(wg *sync.WaitGroup) {
+func (d *Dependency) QueryReleaseVersions(language Language, wg *sync.WaitGroup) {
 
 	defer wg.Done()
 
-	url := fmt.Sprintf(proxyUrlGoModule, d.Name)
-	req, _ := http.NewRequest(http.MethodGet, url, nil)
-	req.Header.Set("User-Agent", "GoMajor/1.0")
-	res, _ := http.DefaultClient.Do(req)
-	defer res.Body.Close()
+	switch language {
+	case GO:
+		d.queryVersionsGo()
+	case PYTHON:
+		d.queryVersionsPython()
+	default:
+		panic(errors.New(fmt.Sprintf("unsupported language %s", language)))
+	}
+}
 
-	versionsBytes, _ := io.ReadAll(res.Body)
+func getVersionsResponse(url string) *http.Response {
+
+	request, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		logrus.Fatal(err.Error())
+		panic(errors.New(fmt.Sprintf("failed to build request with url %s", url)))
+	}
+	request.Header.Set("User-Agent", "GoMajor/1.0")
+
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		logrus.Fatal(err.Error())
+		panic(errors.New(fmt.Sprintf("failed to send request to url %s", url)))
+	}
+	return response
+}
+
+func getLatestVersion(versions []string) *semver.Version {
+
 	versionsAvailable := semver.Collection{}
+	for _, ver := range versions {
+		newVersion, err := semver.NewVersion(strings.TrimSpace(ver))
+		if err != nil {
+			logrus.Info(fmt.Sprintf("invalid version %s", ver))
+			continue
+		}
+
+		versionsAvailable = append(versionsAvailable, newVersion)
+	}
+
+	sort.Sort(versionsAvailable)
+	return versionsAvailable[len(versionsAvailable)-1]
+}
+
+func (d *Dependency) queryVersionsGo() {
+
+	modulePath, err := module.EscapePath(d.Name)
+	if err != nil {
+		logrus.Fatal(err.Error())
+		panic(errors.New(fmt.Sprintf("failed to escape module path %s", d.Name)))
+	}
+	response := getVersionsResponse(fmt.Sprintf(proxyUrlGoModule, modulePath))
+	defer response.Body.Close()
+
+	versionsBytes, _ := io.ReadAll(response.Body)
 	versions := strings.Split(
 		strings.TrimSpace(
 			strings.ReplaceAll(string(versionsBytes), "\r\n", "\n"),
 		),
 		"\n",
 	)
-	for _, ver := range versions {
-		newVersion, err := semver.NewVersion(strings.TrimSpace(ver))
-		d.handleError(err)
-
-		versionsAvailable = append(versionsAvailable, newVersion)
-	}
-	sort.Sort(versionsAvailable)
-	d.VersionLatest = versionsAvailable[len(versionsAvailable)-1]
+	d.VersionLatest = getLatestVersion(versions)
 }
 
-func (d *Dependency) QueryVersionsPython(wg *sync.WaitGroup) {
+func (d *Dependency) queryVersionsPython() {
 
-	defer wg.Done()
-
-	url := fmt.Sprintf(proxyUrlPythonPackage, d.Name)
-	req, _ := http.NewRequest(http.MethodGet, url, nil)
-	req.Header.Set("User-Agent", "GoMajor/1.0")
-	res, _ := http.DefaultClient.Do(req)
-	defer res.Body.Close()
+	response := getVersionsResponse(fmt.Sprintf(proxyUrlPythonPackage, d.Name))
+	defer response.Body.Close()
 
 	var pypiJson PypiJson
-	body, _ := io.ReadAll(res.Body)
+	body, _ := io.ReadAll(response.Body)
 	json.Unmarshal(body, &pypiJson)
 
-	versionsAvailable := semver.Collection{}
+	versions := []string{}
 	for ver, _ := range pypiJson.Releases {
-		newVersion, err := semver.NewVersion(strings.TrimSpace(ver))
-		if err != nil {
-			continue
-		}
-
-		versionsAvailable = append(versionsAvailable, newVersion)
+		versions = append(versions, ver)
 	}
-	sort.Sort(versionsAvailable)
-	d.VersionLatest = versionsAvailable[len(versionsAvailable)-1]
+	d.VersionLatest = getLatestVersion(versions)
 }
 
-func (d *Dependency) IsUpToDate(scope SemVerScope) bool {
+func (d *Dependency) GetOutdatedScope() OutdatedScope {
 
 	current, latest := d.VersionCurrent, d.VersionLatest
-	switch scope {
-	case MAJOR:
-		if latest.Major() > current.Major() {
-			return false
-		}
-	case MINOR:
-		if latest.Minor() > current.Minor() {
-			return false
-		}
-	case PATCH:
-		if latest.Patch() > current.Patch() {
-			return false
-		}
+	if latest.Major() > current.Major() {
+		return MAJOR
 	}
-	return true
-}
-
-func (d *Dependency) Report() {
-
-	ok := d.IsUpToDate(MINOR)
-	fmt.Println(ok)
-}
-
-func (d *Dependency) handleError(err error) {
-
-	if err == nil {
-		return
+	if latest.Minor() > current.Minor() {
+		return MINOR
 	}
-	logrus.Fatal(err.Error())
-	panic(err)
+	if latest.Patch() > current.Patch() {
+		return PATCH
+	}
+	return UP_TO_DATE
 }
