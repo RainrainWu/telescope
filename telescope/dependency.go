@@ -45,9 +45,10 @@ func NewDependency(name, version string) IDependable {
 	}
 
 	return &Dependency{
-		Name:           name,
-		VersionCurrent: versionCurrent,
-		VersionLatest:  nil,
+		Name:                  name,
+		VersionCurrent:        versionCurrent,
+		VersionCurrentLiteral: version,
+		VersionLatest:         nil,
 	}
 }
 

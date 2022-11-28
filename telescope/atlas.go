@@ -91,9 +91,6 @@ func buildAtlasGoMod(fileBytes []byte) IReportable {
 		dependencies: []IDependable{},
 	}
 	for _, require := range modObject.Require {
-		if require.Indirect {
-			continue
-		}
 		atlas.appendDependency(NewDependency(require.Mod.Path, require.Mod.Version))
 	}
 	return &atlas
@@ -111,9 +108,6 @@ func buildAtlasPoetryLock(fileBytes []byte) IReportable {
 		outdatedMap:  map[OutdatedScope][]IDependable{},
 	}
 	for _, pkg := range poetryLock.Packages {
-		if pkg.Category != "main" {
-			continue
-		}
 		atlas.appendDependency(NewDependency(pkg.Name, pkg.Version))
 	}
 	return &atlas
@@ -163,20 +157,20 @@ func (a *Atlas) ReportOutdated(desiredScope OutdatedScope) {
 		}
 		a.reportByScope(scp)
 	}
-	a.reportByScope(UNKNOWN)
+	a.reportUnknownDependencies()
 }
 
 func buildReportItem(dep IDependable) string {
 
 	if dep.(*Dependency).VersionCurrent == nil || dep.(*Dependency).VersionLatest == nil {
 		return fmt.Sprintf(
-			"%-40s %-10s",
+			"%-40s %-20s",
 			dep.(*Dependency).Name,
 			dep.(*Dependency).VersionCurrentLiteral,
 		)
 	}
 	return fmt.Sprintf(
-		"%-40s %-10s %-10s",
+		"%-40s %-20s %-20s",
 		dep.(*Dependency).Name,
 		dep.(*Dependency).VersionCurrent,
 		dep.(*Dependency).VersionLatest,
@@ -197,4 +191,15 @@ func (a *Atlas) reportByScope(scope OutdatedScope) {
 		fmt.Println(buildReportItem(dep))
 	}
 	fmt.Print("\n")
+}
+
+func (a *Atlas) reportUnknownDependencies() {
+
+	if len(a.outdatedMap[UNKNOWN]) == 0 {
+		return
+	}
+	fmt.Printf("[UNKNOWN dependencies]%s\n", strings.Repeat("=", 20))
+	for _, dep := range a.outdatedMap[UNKNOWN] {
+		fmt.Println(buildReportItem(dep))
+	}
 }
