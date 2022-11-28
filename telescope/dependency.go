@@ -26,9 +26,10 @@ type IDependable interface {
 }
 
 type Dependency struct {
-	Name           string
-	VersionCurrent *semver.Version
-	VersionLatest  *semver.Version
+	Name                  string
+	VersionCurrentLiteral string
+	VersionCurrent        *semver.Version
+	VersionLatest         *semver.Version
 }
 
 type PypiJson struct {
@@ -39,8 +40,8 @@ func NewDependency(name, version string) IDependable {
 
 	versionCurrent, err := semver.NewVersion(version)
 	if err != nil {
-		logrus.Fatal(err.Error(), version)
-		panic(err)
+		logrus.Warning(fmt.Sprintf("%s %s", err.Error(), version))
+		return &Dependency{Name: name, VersionCurrentLiteral: version}
 	}
 
 	return &Dependency{
@@ -54,13 +55,17 @@ func (d *Dependency) QueryReleaseVersions(language Language, wg *sync.WaitGroup)
 
 	defer wg.Done()
 
+	if d.VersionCurrent == nil {
+		return
+	}
+
 	switch language {
 	case GO:
 		d.queryVersionsGo()
 	case PYTHON:
 		d.queryVersionsPython()
 	default:
-		panic(errors.New(fmt.Sprintf("unsupported language %s", language)))
+		panic(errors.New(fmt.Sprintf("unsupported language %s", language.String())))
 	}
 }
 
@@ -87,11 +92,14 @@ func getLatestVersion(versions []string) *semver.Version {
 	for _, ver := range versions {
 		newVersion, err := semver.NewVersion(strings.TrimSpace(ver))
 		if err != nil {
-			logrus.Info(fmt.Sprintf("invalid version %s", ver))
+			logrus.Debug(fmt.Sprintf("invalid version %s", ver))
 			continue
 		}
 
 		versionsAvailable = append(versionsAvailable, newVersion)
+	}
+	if len(versionsAvailable) == 0 {
+		return nil
 	}
 
 	sort.Sort(versionsAvailable)
@@ -128,7 +136,7 @@ func (d *Dependency) queryVersionsPython() {
 	json.Unmarshal(body, &pypiJson)
 
 	versions := []string{}
-	for ver, _ := range pypiJson.Releases {
+	for ver := range pypiJson.Releases {
 		versions = append(versions, ver)
 	}
 	d.VersionLatest = getLatestVersion(versions)
@@ -137,6 +145,9 @@ func (d *Dependency) queryVersionsPython() {
 func (d *Dependency) GetOutdatedScope() OutdatedScope {
 
 	current, latest := d.VersionCurrent, d.VersionLatest
+	if current == nil || latest == nil {
+		return UNKNOWN
+	}
 	if latest.Major() > current.Major() {
 		return MAJOR
 	}

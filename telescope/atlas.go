@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"strings"
 	"sync"
 
 	toml "github.com/pelletier/go-toml/v2"
@@ -18,17 +19,13 @@ const (
 	PYTHON
 )
 
-type OutdatedScope int
-
-const (
-	MAJOR OutdatedScope = iota
-	MINOR
-	PATCH
-	UP_TO_DATE
-)
+func (l Language) String() string {
+	return [...]string{"GO", "PYTHON"}[l]
+}
 
 type IReportable interface {
 	queryVersionsInformation()
+	buildOutdatedMap()
 	ReportOutdated(scope OutdatedScope)
 }
 
@@ -36,6 +33,7 @@ type Atlas struct {
 	name         string
 	language     Language
 	dependencies []IDependable
+	outdatedMap  map[OutdatedScope][]IDependable
 }
 
 type PoetryLockPackage struct {
@@ -53,16 +51,19 @@ func NewAtlas(filePath string) IReportable {
 	var atlas IReportable
 
 	fileBytes := parseDependenciesFile(filePath)
+	splitPath := strings.Split(filePath, "/")
+	fileName := splitPath[len(splitPath)-1]
 
-	switch filePath {
+	switch fileName {
 	case "go.mod":
 		atlas = buildAtlasGoMod(fileBytes)
 	case "poetry.lock":
 		atlas = buildAtlasPoetryLock(fileBytes)
 	default:
-		panic(errors.New(fmt.Sprintf("unknown dep file type: %s", filePath)))
+		panic(errors.New(fmt.Sprintf("unknown dep file: %s", filePath)))
 	}
 	atlas.queryVersionsInformation()
+	atlas.buildOutdatedMap()
 	return atlas
 }
 
@@ -107,6 +108,7 @@ func buildAtlasPoetryLock(fileBytes []byte) IReportable {
 		name:         "",
 		language:     PYTHON,
 		dependencies: []IDependable{},
+		outdatedMap:  map[OutdatedScope][]IDependable{},
 	}
 	for _, pkg := range poetryLock.Packages {
 		if pkg.Category != "main" {
@@ -133,25 +135,66 @@ func (a *Atlas) queryVersionsInformation() {
 	queryWaitGroup.Wait()
 }
 
-func (a *Atlas) ReportOutdated(scope OutdatedScope) {
+func (a *Atlas) buildOutdatedMap() {
 
 	outdatedMap := map[OutdatedScope][]IDependable{
-		MAJOR: []IDependable{},
-		MINOR: []IDependable{},
-		PATCH: []IDependable{},
-		UP_TO_DATE: []IDependable{},
+		MAJOR:      {},
+		MINOR:      {},
+		PATCH:      {},
+		UP_TO_DATE: {},
+		UNKNOWN:    {},
 	}
-
 	for _, dep := range a.dependencies {
+		if dep.(*Dependency).VersionCurrent == nil {
+			outdatedMap[UNKNOWN] = append(outdatedMap[UNKNOWN], dep)
+			continue
+		}
 		depOutdatedScope := dep.(*Dependency).GetOutdatedScope()
 		outdatedMap[depOutdatedScope] = append(outdatedMap[depOutdatedScope], dep)
 	}
-	for scp, deps := range outdatedMap {
-		if scp > scope {
-			continue
+	a.outdatedMap = outdatedMap
+}
+
+func (a *Atlas) ReportOutdated(desiredScope OutdatedScope) {
+
+	for _, scp := range [3]OutdatedScope{MAJOR, MINOR, PATCH} {
+		if scp > desiredScope {
+			break
 		}
-		for _, dep := range deps {
-			fmt.Println(dep.(*Dependency).Name, dep.(*Dependency).VersionCurrent, dep.(*Dependency).VersionLatest)
-		}
+		a.reportByScope(scp)
 	}
+	a.reportByScope(UNKNOWN)
+}
+
+func buildReportItem(dep IDependable) string {
+
+	if dep.(*Dependency).VersionCurrent == nil || dep.(*Dependency).VersionLatest == nil {
+		return fmt.Sprintf(
+			"%-40s %-10s",
+			dep.(*Dependency).Name,
+			dep.(*Dependency).VersionCurrentLiteral,
+		)
+	}
+	return fmt.Sprintf(
+		"%-40s %-10s %-10s",
+		dep.(*Dependency).Name,
+		dep.(*Dependency).VersionCurrent,
+		dep.(*Dependency).VersionLatest,
+	)
+}
+
+func (a *Atlas) reportByScope(scope OutdatedScope) {
+
+	fmt.Printf(
+		"\n[%s Version Outdated]%s\n",
+		scope.String(),
+		strings.Repeat("=", 20),
+	)
+	if len(a.outdatedMap[scope]) == 0 {
+		fmt.Printf("no outdated dependencies")
+	}
+	for _, dep := range a.outdatedMap[scope] {
+		fmt.Println(buildReportItem(dep))
+	}
+	fmt.Print("\n")
 }
