@@ -46,7 +46,7 @@ type PoetryLock struct {
 	Packages []PoetryLockPackage `toml:"package"`
 }
 
-func NewAtlas(filePath string, ignoredDeps map[string]bool) IReportable {
+func NewAtlas(filePath string, strictSemVer bool, ignoredDeps map[string]bool) IReportable {
 
 	var atlas IReportable
 
@@ -56,9 +56,9 @@ func NewAtlas(filePath string, ignoredDeps map[string]bool) IReportable {
 
 	switch fileName {
 	case "go.mod":
-		atlas = buildAtlasGoMod(fileBytes, ignoredDeps)
+		atlas = buildAtlasGoMod(fileBytes, strictSemVer, ignoredDeps)
 	case "poetry.lock":
-		atlas = buildAtlasPoetryLock(fileBytes, ignoredDeps)
+		atlas = buildAtlasPoetryLock(fileBytes, strictSemVer, ignoredDeps)
 	default:
 		panic(errors.New(fmt.Sprintf("unknown dep file: %s", filePath)))
 	}
@@ -78,7 +78,7 @@ func parseDependenciesFile(filePath string) []byte {
 	return fileBytes
 }
 
-func buildAtlasGoMod(fileBytes []byte, ignoredDeps map[string]bool) IReportable {
+func buildAtlasGoMod(fileBytes []byte, strictSemVer bool, ignoredDeps map[string]bool) IReportable {
 
 	modObject, err := modfile.Parse("go.mod", fileBytes, nil)
 	if err != nil {
@@ -94,12 +94,14 @@ func buildAtlasGoMod(fileBytes []byte, ignoredDeps map[string]bool) IReportable 
 		if _, ok := ignoredDeps[require.Mod.Path]; ok {
 			continue
 		}
-		atlas.appendDependency(NewDependency(require.Mod.Path, require.Mod.Version))
+		atlas.appendDependency(
+			NewDependency(require.Mod.Path, require.Mod.Version, strictSemVer),
+		)
 	}
 	return &atlas
 }
 
-func buildAtlasPoetryLock(fileBytes []byte, ignoredDeps map[string]bool) IReportable {
+func buildAtlasPoetryLock(fileBytes []byte, strictSemVer bool, ignoredDeps map[string]bool) IReportable {
 
 	var poetryLock PoetryLock
 	toml.Unmarshal(fileBytes, &poetryLock)
@@ -114,7 +116,9 @@ func buildAtlasPoetryLock(fileBytes []byte, ignoredDeps map[string]bool) IReport
 		if _, ok := ignoredDeps[pkg.Name]; ok {
 			continue
 		}
-		atlas.appendDependency(NewDependency(pkg.Name, pkg.Version))
+		atlas.appendDependency(
+			NewDependency(pkg.Name, pkg.Version, strictSemVer),
+		)
 	}
 	return &atlas
 }
