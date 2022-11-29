@@ -40,7 +40,7 @@ func NewDependency(name, version string) IDependable {
 
 	versionCurrent, err := semver.NewVersion(version)
 	if err != nil {
-		logrus.Warning(fmt.Sprintf("%s %s", err.Error(), version))
+		logrus.Debug(fmt.Sprintf("%s %s", err.Error(), version))
 		return &Dependency{Name: name, VersionCurrentLiteral: version}
 	}
 
