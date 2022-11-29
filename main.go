@@ -44,7 +44,7 @@ func init() {
 
 func usage() {
 
-	fmt.Fprintf(os.Stderr, "Usage: telescope [-f file_path] [-s outdated_scope] [-i ignored_dependency] [--skip-unknown] [ [--strict-semver]]\n")
+	fmt.Fprintf(os.Stderr, "Usage: telescope [-f file_path] [-s outdated_scope] [-i ignored_dependency] [--skip-unknown] [--strict-semver]\n")
 	flag.PrintDefaults()
 }
 
