@@ -27,6 +27,7 @@ type IDependable interface {
 
 type Dependency struct {
 	Name                  string
+	StrictSemVer          bool
 	VersionCurrentLiteral string
 	VersionCurrent        *semver.Version
 	VersionLatest         *semver.Version
@@ -36,19 +37,40 @@ type PypiJson struct {
 	Releases map[string]struct{} `json:"releases"`
 }
 
-func NewDependency(name, version string) IDependable {
+func NewSematicVersion(version string, strict bool) (*semver.Version, error) {
 
-	versionCurrent, err := semver.NewVersion(version)
+	semanticVersion, err := semver.NewVersion(version)
+	if strict || err == nil {
+		return semanticVersion, err
+	}
+
+	truncatedVersion := strings.FieldsFunc(
+		version,
+		func(r rune) bool {
+			// truncate rc, alpha, and beta flags
+			return strings.ContainsRune("rc a b", r)
+		},
+	)[0]
+	return semver.NewVersion(truncatedVersion)
+}
+
+func NewDependency(name, version string, strictSemVer bool) IDependable {
+
+	versionCurrent, err := NewSematicVersion(version, strictSemVer)
 	if err != nil {
 		logrus.Debug(fmt.Sprintf("%s %s", err.Error(), version))
-		return &Dependency{Name: name, VersionCurrentLiteral: version}
+		return &Dependency{
+			Name:                  name,
+			StrictSemVer:          strictSemVer,
+			VersionCurrentLiteral: version,
+		}
 	}
 
 	return &Dependency{
 		Name:                  name,
-		VersionCurrent:        versionCurrent,
+		StrictSemVer:          strictSemVer,
 		VersionCurrentLiteral: version,
-		VersionLatest:         nil,
+		VersionCurrent:        versionCurrent,
 	}
 }
 
@@ -87,11 +109,11 @@ func getVersionsResponse(url string) *http.Response {
 	return response
 }
 
-func getLatestVersion(versions []string) *semver.Version {
+func getLatestVersion(versions []string, strictSemVer bool) *semver.Version {
 
 	versionsAvailable := semver.Collection{}
 	for _, ver := range versions {
-		newVersion, err := semver.NewVersion(strings.TrimSpace(ver))
+		newVersion, err := NewSematicVersion(strings.TrimSpace(ver), strictSemVer)
 		if err != nil {
 			logrus.Debug(fmt.Sprintf("invalid version %s", ver))
 			continue
@@ -124,7 +146,7 @@ func (d *Dependency) queryVersionsGo() {
 		),
 		"\n",
 	)
-	d.VersionLatest = getLatestVersion(versions)
+	d.VersionLatest = getLatestVersion(versions, d.StrictSemVer)
 }
 
 func (d *Dependency) queryVersionsPython() {
@@ -140,7 +162,7 @@ func (d *Dependency) queryVersionsPython() {
 	for ver := range pypiJson.Releases {
 		versions = append(versions, ver)
 	}
-	d.VersionLatest = getLatestVersion(versions)
+	d.VersionLatest = getLatestVersion(versions, d.StrictSemVer)
 }
 
 func (d *Dependency) GetOutdatedScope() OutdatedScope {
