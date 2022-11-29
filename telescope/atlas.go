@@ -46,7 +46,7 @@ type PoetryLock struct {
 	Packages []PoetryLockPackage `toml:"package"`
 }
 
-func NewAtlas(filePath string) IReportable {
+func NewAtlas(filePath string, ignoredDeps map[string]bool) IReportable {
 
 	var atlas IReportable
 
@@ -56,9 +56,9 @@ func NewAtlas(filePath string) IReportable {
 
 	switch fileName {
 	case "go.mod":
-		atlas = buildAtlasGoMod(fileBytes)
+		atlas = buildAtlasGoMod(fileBytes, ignoredDeps)
 	case "poetry.lock":
-		atlas = buildAtlasPoetryLock(fileBytes)
+		atlas = buildAtlasPoetryLock(fileBytes, ignoredDeps)
 	default:
 		panic(errors.New(fmt.Sprintf("unknown dep file: %s", filePath)))
 	}
@@ -78,7 +78,7 @@ func parseDependenciesFile(filePath string) []byte {
 	return fileBytes
 }
 
-func buildAtlasGoMod(fileBytes []byte) IReportable {
+func buildAtlasGoMod(fileBytes []byte, ignoredDeps map[string]bool) IReportable {
 
 	modObject, err := modfile.Parse("go.mod", fileBytes, nil)
 	if err != nil {
@@ -91,12 +91,15 @@ func buildAtlasGoMod(fileBytes []byte) IReportable {
 		dependencies: []IDependable{},
 	}
 	for _, require := range modObject.Require {
+		if _, ok := ignoredDeps[require.Mod.Path]; ok {
+			continue
+		}
 		atlas.appendDependency(NewDependency(require.Mod.Path, require.Mod.Version))
 	}
 	return &atlas
 }
 
-func buildAtlasPoetryLock(fileBytes []byte) IReportable {
+func buildAtlasPoetryLock(fileBytes []byte, ignoredDeps map[string]bool) IReportable {
 
 	var poetryLock PoetryLock
 	toml.Unmarshal(fileBytes, &poetryLock)
@@ -108,6 +111,9 @@ func buildAtlasPoetryLock(fileBytes []byte) IReportable {
 		outdatedMap:  map[OutdatedScope][]IDependable{},
 	}
 	for _, pkg := range poetryLock.Packages {
+		if _, ok := ignoredDeps[pkg.Name]; ok {
+			continue
+		}
 		atlas.appendDependency(NewDependency(pkg.Name, pkg.Version))
 	}
 	return &atlas
@@ -200,7 +206,7 @@ func (a *Atlas) reportUnknownDependencies() {
 	if len(a.outdatedMap[UNKNOWN]) == 0 {
 		return
 	}
-	fmt.Printf("[UNKNOWN dependencies]%s\n", strings.Repeat("=", 20))
+	fmt.Printf("\n[UNKNOWN dependencies]%s\n", strings.Repeat("=", 20))
 	for _, dep := range a.outdatedMap[UNKNOWN] {
 		fmt.Println(buildReportItem(dep))
 	}
