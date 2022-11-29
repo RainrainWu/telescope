@@ -19,6 +19,7 @@ func (i *IgnoredDependencies) String() string {
 }
 
 func (i *IgnoredDependencies) Set(value string) error {
+
 	map[string]bool(*i)[value] = true
 	return nil
 }
@@ -40,6 +41,7 @@ func init() {
 }
 
 func usage() {
+
 	fmt.Fprintf(os.Stderr, "Usage: telescope [-f file_path] [-s outdated_scope] [-i ignored_dependency] [--skip-unknown]\n")
 	flag.PrintDefaults()
 }
