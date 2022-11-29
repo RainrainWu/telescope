@@ -16,6 +16,14 @@ const (
 	UNKNOWN
 )
 
+var MapScopeColor map[OutdatedScope]int = map[OutdatedScope]int{
+	MAJOR:      91,
+	MINOR:      93,
+	PATCH:      94,
+	UP_TO_DATE: 92,
+	UNKNOWN:    97,
+}
+
 func (o OutdatedScope) String() string {
 	return [...]string{"MAJOR", "MINOR", "PATCH", "UP_TO_DATE", "UNKNOWN"}[o]
 }

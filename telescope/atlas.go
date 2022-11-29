@@ -165,7 +165,8 @@ func (a *Atlas) ReportOutdated(desiredScope OutdatedScope, skipUnknown bool) {
 		if scp > desiredScope {
 			break
 		}
-		a.reportByScope(scp)
+		color, _ := MapScopeColor[scp]
+		a.reportByScope(scp, color)
 	}
 	if !skipUnknown {
 		a.reportUnknownDependencies()
@@ -176,25 +177,27 @@ func buildReportItem(dep IDependable) string {
 
 	if dep.(*Dependency).VersionCurrent == nil || dep.(*Dependency).VersionLatest == nil {
 		return fmt.Sprintf(
-			"%-40s %-20s",
+			"%-50s %-20s",
 			dep.(*Dependency).Name,
 			dep.(*Dependency).VersionCurrentLiteral,
 		)
 	}
 	return fmt.Sprintf(
-		"%-40s %-20s %-20s",
+		"%-50s %-20s %-20s",
 		dep.(*Dependency).Name,
 		dep.(*Dependency).VersionCurrent,
 		dep.(*Dependency).VersionLatest,
 	)
 }
 
-func (a *Atlas) reportByScope(scope OutdatedScope) {
+func (a *Atlas) reportByScope(scope OutdatedScope, color int) {
 
 	fmt.Printf(
-		"\n[%s Version Outdated]%s\n",
+		"\033[%dm\n[ %d %s Version Outdated ]%s\n",
+		color,
+		len(a.outdatedMap[scope]),
 		scope.String(),
-		strings.Repeat("=", 20),
+		strings.Repeat("=", 40),
 	)
 	if len(a.outdatedMap[scope]) == 0 {
 		fmt.Printf("no outdated dependencies")
@@ -202,7 +205,7 @@ func (a *Atlas) reportByScope(scope OutdatedScope) {
 	for _, dep := range a.outdatedMap[scope] {
 		fmt.Println(buildReportItem(dep))
 	}
-	fmt.Print("\n")
+	fmt.Print("\n\033[0m")
 }
 
 func (a *Atlas) reportUnknownDependencies() {
@@ -210,7 +213,11 @@ func (a *Atlas) reportUnknownDependencies() {
 	if len(a.outdatedMap[UNKNOWN]) == 0 {
 		return
 	}
-	fmt.Printf("\n[UNKNOWN dependencies]%s\n", strings.Repeat("=", 20))
+	fmt.Printf(
+		"\n[ %d UNKNOWN dependencies ]%s\n",
+		len(a.outdatedMap[UNKNOWN]),
+		strings.Repeat("=", 40),
+	)
 	for _, dep := range a.outdatedMap[UNKNOWN] {
 		fmt.Println(buildReportItem(dep))
 	}
