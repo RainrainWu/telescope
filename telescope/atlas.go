@@ -26,7 +26,7 @@ func (l Language) String() string {
 type IReportable interface {
 	queryVersionsInformation()
 	buildOutdatedMap()
-	ReportOutdated(scope OutdatedScope)
+	ReportOutdated(scope OutdatedScope, skipUnknown bool)
 }
 
 type Atlas struct {
@@ -149,7 +149,7 @@ func (a *Atlas) buildOutdatedMap() {
 	a.outdatedMap = outdatedMap
 }
 
-func (a *Atlas) ReportOutdated(desiredScope OutdatedScope) {
+func (a *Atlas) ReportOutdated(desiredScope OutdatedScope, skipUnknown bool) {
 
 	for _, scp := range [3]OutdatedScope{MAJOR, MINOR, PATCH} {
 		if scp > desiredScope {
@@ -157,7 +157,9 @@ func (a *Atlas) ReportOutdated(desiredScope OutdatedScope) {
 		}
 		a.reportByScope(scp)
 	}
-	a.reportUnknownDependencies()
+	if !skipUnknown {
+		a.reportUnknownDependencies()
+	}
 }
 
 func buildReportItem(dep IDependable) string {
