@@ -2,7 +2,6 @@ package telescope
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -88,7 +87,7 @@ func (d *Dependency) QueryReleaseVersions(language Language, wg *sync.WaitGroup)
 	case PYTHON:
 		d.queryVersionsPython()
 	default:
-		panic(errors.New(fmt.Sprintf("unsupported language %s", language.String())))
+		panic(fmt.Errorf("unsupported language %s", language.String()))
 	}
 }
 
@@ -97,14 +96,14 @@ func getVersionsResponse(url string) *http.Response {
 	request, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		logrus.Fatal(err.Error())
-		panic(errors.New(fmt.Sprintf("failed to build request with url %s", url)))
+		panic(fmt.Errorf("failed to build request with url %s", url))
 	}
 	request.Header.Set("User-Agent", "GoMajor/1.0")
 
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		logrus.Fatal(err.Error())
-		panic(errors.New(fmt.Sprintf("failed to send request to url %s", url)))
+		panic(fmt.Errorf("failed to send request to url %s", url))
 	}
 	return response
 }
@@ -134,7 +133,7 @@ func (d *Dependency) queryVersionsGo() {
 	modulePath, err := module.EscapePath(d.Name)
 	if err != nil {
 		logrus.Fatal(err.Error())
-		panic(errors.New(fmt.Sprintf("failed to escape module path %s", d.Name)))
+		panic(fmt.Errorf("failed to escape module path %s", d.Name))
 	}
 	response := getVersionsResponse(fmt.Sprintf(proxyUrlGoModule, modulePath))
 	defer response.Body.Close()
@@ -156,7 +155,10 @@ func (d *Dependency) queryVersionsPython() {
 
 	var pypiJson PypiJson
 	body, _ := io.ReadAll(response.Body)
-	json.Unmarshal(body, &pypiJson)
+	err := json.Unmarshal(body, &pypiJson)
+	if err != nil {
+		panic(err)
+	}
 
 	versions := []string{}
 	for ver := range pypiJson.Releases {

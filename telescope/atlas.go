@@ -1,9 +1,8 @@
 package telescope
 
 import (
-	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -62,7 +61,7 @@ func NewAtlas(filePath string, strictSemVer bool, ignoredDeps map[string]bool) I
 	case "poetry.lock":
 		atlas = buildAtlasPoetryLock(fileBytes, strictSemVer, ignoredDeps)
 	default:
-		panic(errors.New(fmt.Sprintf("unknown dep file: %s", filePath)))
+		panic(fmt.Errorf("unknown dep file: %s", filePath))
 	}
 	atlas.sortLexicographically()
 	atlas.queryVersionsInformation()
@@ -72,10 +71,10 @@ func NewAtlas(filePath string, strictSemVer bool, ignoredDeps map[string]bool) I
 
 func parseDependenciesFile(filePath string) []byte {
 
-	fileBytes, err := ioutil.ReadFile(filePath)
+	fileBytes, err := os.ReadFile(filePath)
 	if err != nil {
 		logrus.Fatal(err.Error())
-		panic(errors.New(fmt.Sprintf("failed to read dep file %s", filePath)))
+		panic(fmt.Errorf("failed to read dep file %s", filePath))
 	}
 
 	return fileBytes
@@ -107,7 +106,10 @@ func buildAtlasGoMod(fileBytes []byte, strictSemVer bool, ignoredDeps map[string
 func buildAtlasPoetryLock(fileBytes []byte, strictSemVer bool, ignoredDeps map[string]bool) IReportable {
 
 	var poetryLock PoetryLock
-	toml.Unmarshal(fileBytes, &poetryLock)
+	err := toml.Unmarshal(fileBytes, &poetryLock)
+	if err != nil {
+		panic(err)
+	}
 
 	atlas := Atlas{
 		name:         "",
@@ -181,7 +183,7 @@ func (a *Atlas) ReportOutdated(desiredScope OutdatedScope, skipUnknown bool) {
 		if scp > desiredScope {
 			break
 		}
-		color, _ := MapScopeColor[scp]
+		color := MapScopeColor[scp]
 		a.reportByScope(scp, color)
 	}
 	if !skipUnknown {
