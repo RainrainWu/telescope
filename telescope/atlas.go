@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"sort"
 	"strings"
 	"sync"
 
@@ -24,6 +25,7 @@ func (l Language) String() string {
 }
 
 type IReportable interface {
+	sortLexicographically()
 	queryVersionsInformation()
 	buildOutdatedMap()
 	ReportOutdated(scope OutdatedScope, skipUnknown bool)
@@ -62,6 +64,7 @@ func NewAtlas(filePath string, strictSemVer bool, ignoredDeps map[string]bool) I
 	default:
 		panic(errors.New(fmt.Sprintf("unknown dep file: %s", filePath)))
 	}
+	atlas.sortLexicographically()
 	atlas.queryVersionsInformation()
 	atlas.buildOutdatedMap()
 	return atlas
@@ -126,6 +129,19 @@ func buildAtlasPoetryLock(fileBytes []byte, strictSemVer bool, ignoredDeps map[s
 func (a *Atlas) appendDependency(dep IDependable) {
 
 	a.dependencies = append(a.dependencies, dep)
+}
+
+func (a *Atlas) sortLexicographically() {
+
+	sort.SliceStable(
+		a.dependencies,
+		func(i, j int) bool {
+			return strings.Compare(
+				a.dependencies[i].(*Dependency).Name,
+				a.dependencies[j].(*Dependency).Name,
+			) == -1
+		},
+	)
 }
 
 func (a *Atlas) queryVersionsInformation() {
