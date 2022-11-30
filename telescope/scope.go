@@ -1,7 +1,6 @@
 package telescope
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 )
@@ -36,5 +35,5 @@ func OutdatedScopeStrToEnum(scopeStr string) OutdatedScope {
 			return OutdatedScope(idx)
 		}
 	}
-	panic(errors.New(fmt.Sprintf("unknown scope %s", scopeStr)))
+	panic(fmt.Errorf("unknown scope %s", scopeStr))
 }
