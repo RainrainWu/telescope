@@ -1,4 +1,7 @@
 # General
+PWD	:= $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+
+# Docker
 CONTAINER_REGISTRY 	:= docker.io
 IMAGE_NAME 			:= r41nwu/telescope
 
@@ -17,10 +20,10 @@ lint:
 	gofmt -w -s .
 	docker run \
 		--rm \
-		-v $(pwd):/app \
+		-v ${PWD}:/app \
 		-w /app \
 		golangci/golangci-lint:v1.50.1 \
-		golangci-lint run -v
+		golangci-lint run
 
 .PHONY: build
 build:
