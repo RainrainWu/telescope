@@ -10,7 +10,9 @@ Telescope is a dependencies scanner that helps developers sort out outdated depe
 ```
 $ docker run --rm docker.io/r41nwu/telescope:latest
 
-Usage: telescope [-f file_path] [-s outdated_scope] [-i ignored_dependency] [--skip-unknown] [--strict-semver]
+Usage: telescope [-f file_path] [-s outdated_scope] [-i ignored_dependency] [-c critical_dependency] [--skip-unknown] [--strict-semver]
+  -c value
+        highlight critical dependency
   -f string
         dependencies file path (default "go.mod")
   -i value
