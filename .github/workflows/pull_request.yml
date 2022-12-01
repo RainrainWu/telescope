@@ -20,3 +20,7 @@ jobs:
 
     - name: Build
       run: make build
+      
+    - name: Check Outdated Dependencies
+      uses: r41nwu/telescope@latest
+      run: telescope --strict-semver -c "major:*"
