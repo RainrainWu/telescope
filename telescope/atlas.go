@@ -24,15 +24,13 @@ func (l Language) String() string {
 }
 
 type IReportable interface {
-	sortLexicographically()
-	queryVersionsInformation()
-	buildOutdatedMap()
-	ReportOutdated(scope OutdatedScope, skipUnknown bool)
+	ReportOutdated(scope OutdatedScope, skipUnknown bool) bool
 }
 
 type Atlas struct {
 	name         string
 	language     Language
+	criticalMap  map[string]OutdatedScope
 	dependencies []IDependable
 	outdatedMap  map[OutdatedScope][]IDependable
 }
@@ -47,7 +45,12 @@ type PoetryLock struct {
 	Packages []PoetryLockPackage `toml:"package"`
 }
 
-func NewAtlas(filePath string, strictSemVer bool, ignoredDeps map[string]bool) IReportable {
+func NewAtlas(
+	filePath string,
+	strictSemVer bool,
+	ignoredDeps map[string]bool,
+	criticalDeps map[string]OutdatedScope,
+) IReportable {
 
 	var atlas IReportable
 
@@ -57,15 +60,15 @@ func NewAtlas(filePath string, strictSemVer bool, ignoredDeps map[string]bool) I
 
 	switch fileName {
 	case "go.mod":
-		atlas = buildAtlasGoMod(fileBytes, strictSemVer, ignoredDeps)
+		atlas = buildAtlasGoMod(fileBytes, strictSemVer, ignoredDeps, criticalDeps)
 	case "poetry.lock":
-		atlas = buildAtlasPoetryLock(fileBytes, strictSemVer, ignoredDeps)
+		atlas = buildAtlasPoetryLock(fileBytes, strictSemVer, ignoredDeps, criticalDeps)
 	default:
 		panic(fmt.Errorf("unknown dep file: %s", filePath))
 	}
-	atlas.sortLexicographically()
-	atlas.queryVersionsInformation()
-	atlas.buildOutdatedMap()
+	atlas.(*Atlas).sortLexicographically()
+	atlas.(*Atlas).queryVersionsInformation()
+	atlas.(*Atlas).buildOutdatedMap()
 	return atlas
 }
 
@@ -80,7 +83,7 @@ func parseDependenciesFile(filePath string) []byte {
 	return fileBytes
 }
 
-func buildAtlasGoMod(fileBytes []byte, strictSemVer bool, ignoredDeps map[string]bool) IReportable {
+func buildAtlasGoMod(fileBytes []byte, strictSemVer bool, ignoredDeps map[string]bool, criticalDeps map[string]OutdatedScope) IReportable {
 
 	modObject, err := modfile.Parse("go.mod", fileBytes, nil)
 	if err != nil {
@@ -90,6 +93,7 @@ func buildAtlasGoMod(fileBytes []byte, strictSemVer bool, ignoredDeps map[string
 	atlas := Atlas{
 		name:         modObject.Module.Mod.Path,
 		language:     GO,
+		criticalMap:  criticalDeps,
 		dependencies: []IDependable{},
 	}
 	for _, require := range modObject.Require {
@@ -103,7 +107,7 @@ func buildAtlasGoMod(fileBytes []byte, strictSemVer bool, ignoredDeps map[string
 	return &atlas
 }
 
-func buildAtlasPoetryLock(fileBytes []byte, strictSemVer bool, ignoredDeps map[string]bool) IReportable {
+func buildAtlasPoetryLock(fileBytes []byte, strictSemVer bool, ignoredDeps map[string]bool, criticalDeps map[string]OutdatedScope) IReportable {
 
 	var poetryLock PoetryLock
 	err := toml.Unmarshal(fileBytes, &poetryLock)
@@ -115,6 +119,7 @@ func buildAtlasPoetryLock(fileBytes []byte, strictSemVer bool, ignoredDeps map[s
 		name:         "",
 		language:     PYTHON,
 		dependencies: []IDependable{},
+		criticalMap:  criticalDeps,
 		outdatedMap:  map[OutdatedScope][]IDependable{},
 	}
 	for _, pkg := range poetryLock.Packages {
@@ -177,18 +182,22 @@ func (a *Atlas) buildOutdatedMap() {
 	a.outdatedMap = outdatedMap
 }
 
-func (a *Atlas) ReportOutdated(desiredScope OutdatedScope, skipUnknown bool) {
+func (a *Atlas) ReportOutdated(desiredScope OutdatedScope, skipUnknown bool) bool {
+
+	var criticalFound bool
 
 	for _, scp := range [3]OutdatedScope{MAJOR, MINOR, PATCH} {
 		if scp > desiredScope {
 			break
 		}
 		color := MapScopeColor[scp]
-		a.reportByScope(scp, color)
+		criticalFound = a.reportByScope(scp, color) || criticalFound
 	}
 	if !skipUnknown {
 		a.reportUnknownDependencies()
 	}
+
+	return criticalFound
 }
 
 func buildReportItem(dep IDependable) string {
@@ -208,10 +217,15 @@ func buildReportItem(dep IDependable) string {
 	)
 }
 
-func (a *Atlas) reportByScope(scope OutdatedScope, color int) {
+func (a *Atlas) reportByScope(scope OutdatedScope, color int) bool {
+
+	var criticalFound, criticalAnyway bool
+	if scp, ok := a.criticalMap["*"]; ok {
+		criticalAnyway = scp >= scope
+	}
 
 	fmt.Printf(
-		"\033[%dm\n[ %d %s Version Outdated ]%s\n",
+		"\033[%dm\n[ %d %s Version Outdated ]%s\n\n",
 		color,
 		len(a.outdatedMap[scope]),
 		scope.String(),
@@ -220,10 +234,20 @@ func (a *Atlas) reportByScope(scope OutdatedScope, color int) {
 	if len(a.outdatedMap[scope]) == 0 {
 		fmt.Printf("no outdated dependencies")
 	}
+
 	for _, dep := range a.outdatedMap[scope] {
-		fmt.Println(buildReportItem(dep))
+
+		scp, ok := a.criticalMap[dep.(*Dependency).Name]
+		if criticalAnyway || (ok && scp >= scope) {
+			criticalFound = criticalFound || true
+			fmt.Printf("* %s\n", buildReportItem(dep))
+		} else {
+			fmt.Printf("  %s\n", buildReportItem(dep))
+		}
 	}
 	fmt.Print("\n\033[0m")
+
+	return criticalFound
 }
 
 func (a *Atlas) reportUnknownDependencies() {
@@ -232,11 +256,11 @@ func (a *Atlas) reportUnknownDependencies() {
 		return
 	}
 	fmt.Printf(
-		"\n[ %d UNKNOWN dependencies ]%s\n",
+		"\n[ %d UNKNOWN dependencies ]%s\n\n",
 		len(a.outdatedMap[UNKNOWN]),
 		strings.Repeat("=", 40),
 	)
 	for _, dep := range a.outdatedMap[UNKNOWN] {
-		fmt.Println(buildReportItem(dep))
+		fmt.Printf("  %s\n", buildReportItem(dep))
 	}
 }
