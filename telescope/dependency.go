@@ -33,7 +33,7 @@ type Dependency struct {
 }
 
 type PypiJson struct {
-	Releases map[string]struct{} `json:"releases"`
+	Releases map[string][]struct{} `json:"releases"`
 }
 
 func NewSematicVersion(version string, strict bool) (*semver.Version, error) {
@@ -160,7 +160,7 @@ func (d *Dependency) queryVersionsPython() {
 	body, _ := io.ReadAll(response.Body)
 	err := json.Unmarshal(body, &pypiJson)
 	if err != nil {
-		panic(err)
+		return
 	}
 
 	versions := []string{}
