@@ -26,7 +26,7 @@ jobs:
     container:
       image: r41nwu/telescope:latest
       volumes:
-      - $PWD/go.mod:/go.mod
+      - ${GITHUB_WORKSPACE}/go.mod:/go.mod
 
     steps:  
     - name: Scan Outdated Dependencies
