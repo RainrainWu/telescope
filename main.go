@@ -68,7 +68,7 @@ var (
 	skipUnknown          bool
 	strictSemVer         bool
 	ignoredDependencies  IgnoredDependencies  = make(map[string]bool)
-	criticalDependencies CriticalDependencies = make(map[string]telescope.OutdatedScope)
+	criticalDependencies CriticalDependencies = map[string]telescope.OutdatedScope{"*": telescope.MAJOR}
 )
 
 func init() {

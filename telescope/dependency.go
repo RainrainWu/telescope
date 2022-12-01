@@ -49,8 +49,11 @@ func NewSematicVersion(version string, strict bool) (*semver.Version, error) {
 			// truncate rc, alpha, and beta flags
 			return strings.ContainsRune("rc a b", r)
 		},
-	)[0]
-	return semver.NewVersion(truncatedVersion)
+	)
+	if len(truncatedVersion) == 0 {
+		return nil, fmt.Errorf("invalid version string %s", version)
+	}
+	return semver.NewVersion(truncatedVersion[0])
 }
 
 func NewDependency(name, version string, strictSemVer bool) IDependable {
