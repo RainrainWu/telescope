@@ -1,4 +1,4 @@
-name: Dockerized CI
+name: Pull Request
 
 on:
   push:
