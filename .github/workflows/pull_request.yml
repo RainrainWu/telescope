@@ -26,9 +26,9 @@ jobs:
     container:
       image: r41nwu/telescope:latest
       volumes:
-      - ${{ github.workspace }}/go.mod:/go.mod
+      - ${{ github.workspace }}:/src
 
     steps:  
     - name: Scan Outdated Dependencies
       run: |
-        telescope --strict-semver
+        telescope -f "/src/go.mod" --strict-semver
