@@ -5,7 +5,7 @@ WORKDIR /src
 RUN apk add --update --no-cache ca-certificates && \
     CGO_ENABLED=0 go build -o /src/bin/telescope .
 
-FROM scratch
+FROM alpine:latest
 
 ENV PATH=/
 COPY --from=builder /src/bin/ /
