@@ -26,7 +26,7 @@ jobs:
     container:
       image: r41nwu/telescope:latest
       volumes:
-      - ${{ github.workspace }}:/src
+      - ${{ github.workspace }}/go.mod:/src/go.mod
 
     steps:  
     - name: Scan Outdated Dependencies
