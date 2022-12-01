@@ -7,7 +7,7 @@ RUN apk add --update --no-cache ca-certificates && \
 
 FROM alpine:latest
 
-ENV PATH=/
+ENV PATH=$PATH:/
 COPY --from=builder /src/bin/ /
 COPY --from=builder /etc/ssl/certs /etc/ssl/certs
 
