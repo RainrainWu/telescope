@@ -1,8 +1,8 @@
-name: "Release Tags"
+name: Release Tags
+
 on:
   push:
-    tags:
-      - v*
+    tags: [ "v*" ]
 
 jobs:
   release-dockerhub:
