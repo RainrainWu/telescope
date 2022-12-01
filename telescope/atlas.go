@@ -219,7 +219,10 @@ func buildReportItem(dep IDependable) string {
 
 func (a *Atlas) reportByScope(scope OutdatedScope, color int) bool {
 
-	var criticalFound bool
+	var criticalFound, criticalAnyway bool
+	if scp, ok := a.criticalMap["*"]; ok {
+		criticalAnyway = scp >= scope
+	}
 
 	fmt.Printf(
 		"\033[%dm\n[ %d %s Version Outdated ]%s\n\n",
@@ -234,7 +237,8 @@ func (a *Atlas) reportByScope(scope OutdatedScope, color int) bool {
 
 	for _, dep := range a.outdatedMap[scope] {
 
-		if scp, ok := a.criticalMap[dep.(*Dependency).Name]; ok && scp >= scope {
+		scp, ok := a.criticalMap[dep.(*Dependency).Name]
+		if criticalAnyway || (ok && scp >= scope) {
 			criticalFound = criticalFound || true
 			fmt.Printf("* %s\n", buildReportItem(dep))
 		} else {
