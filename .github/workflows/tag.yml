@@ -1,0 +1,63 @@
+name: "Release Tags"
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  release-dockerhub:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - Dockerfile: Dockerfile
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+
+      - name: Unshallow
+        run: git fetch --prune --unshallow
+
+      - name: Prepare
+        id: prepare
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          MAJOR=${TAG%.*}
+          SHORT_COMMIT=${GITHUB_SHA::8}
+          DATE=$(date '+%Y-%m-%dT%H:%M:%SZ')
+          echo ::set-output name=tag_name::${TAG}
+          echo ::set-output name=major_tag::${MAJOR}
+          echo ::set-output name=short_commit::${SHORT_COMMIT}
+          echo ::set-output name=date::${DATE}
+          echo ::set-output name=full_tag_name::${TAG}
+          echo ::set-output name=full_major_tag::${MAJOR}
+          echo ::set-output name=latest_tag::latest
+ 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login do docker.io
+        run: docker login -u r41nwu -p ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
+
+      - name: Build and publish ${{ matrix.target.Dockerfile }}
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: ${{ matrix.target.Dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            VERSION=${{ steps.prepare.outputs.tag_name }}
+            SHORT_COMMIT=${{ steps.prepare.outputs.short_commit }}
+            DATE=${{ steps.prepare.outputs.date }}
+          tags: |
+            r41nwu/telescope:${{ steps.prepare.outputs.full_tag_name }}
+            r41nwu/telescope:${{ steps.prepare.outputs.full_major_tag }}
+            r41nwu/telescope:${{ steps.prepare.outputs.latest_tag }}
