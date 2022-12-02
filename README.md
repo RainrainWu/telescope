@@ -2,6 +2,7 @@
 
 Telescope is a dependencies scanner that helps developers sort out outdated dependencies with desired scope easily and review the necessity to arrange an upgrade plan.
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/rainrainwu/telescope)](https://goreportcard.com/report/github.com/rainrainwu/telescope)
 [![codecov](https://codecov.io/gh/RainrainWu/telescope/branch/master/graph/badge.svg?token=4HWXOZEIsG)](https://codecov.io/gh/RainrainWu/telescope)
 
 #### Currently Supported Dependencies Lock Files
