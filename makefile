@@ -25,6 +25,11 @@ lint:
 		golangci/golangci-lint:v1.50.1 \
 		golangci-lint run
 
+.PHONY: test
+test:
+	go test -cover -coverprofile cover.out ./telescope
+
+
 .PHONY: build
 build:
 	docker build \
