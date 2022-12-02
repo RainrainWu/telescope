@@ -11,12 +11,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    
+
     - name: Checkout branch
       uses: actions/checkout@v3
 
-    - name: Run golangci-lint
+    - name: Lint
       uses: golangci/golangci-lint-action@v3.3.1
+
+    - name: Test
+      run: make test
 
     - name: Build
       run: make build
