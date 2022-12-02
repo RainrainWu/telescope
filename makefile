@@ -27,7 +27,7 @@ lint:
 
 .PHONY: test
 test:
-	go test -cover ./telescope
+	go test -cover -coverprofile cover.out ./telescope
 
 
 .PHONY: build
