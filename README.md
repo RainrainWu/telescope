@@ -8,6 +8,7 @@ Telescope is a dependencies scanner that helps developers sort out outdated depe
 #### Currently Supported Dependencies Lock Files
 - `go.mod`
 - `poetry.lock`
+- `Pipfile.lock`
 
 ## Usage
 ```
@@ -15,11 +16,11 @@ $ docker run --rm docker.io/r41nwu/telescope:latest
 
 Usage: telescope [-f file_path] [-s outdated_scope] [-i ignored_dependency] [-c critical_dependency] [--skip-unknown] [--strict-semver]
   -c value
-        highlight critical dependency
+        highlight critical dependencies with regular expression
   -f string
         dependencies file path (default "go.mod")
   -i value
-        ignore specific dependency
+        ignore specific dependencies with regular expression
   -s string
         desired outdated scope (default "major")
   -skip-unknown
@@ -51,6 +52,15 @@ docker run \
     -v "$YOUR_POETRY_LOCK_FILE:/poetry.lock" \
     docker.io/r41nwu/telescope:latest \
     telescope -f "poetry.lock" -s "minor"
+```
+
+- With `Pipfile.lock` file
+```
+docker run \
+    --rm \
+    -v "$YOUR_PIPFILE_LOCK_FILE:/Pipfile.lock" \
+    docker.io/r41nwu/telescope:latest \
+    telescope -f "Pipfile.lock" -s "minor"
 ```
 
 ### Example Output
@@ -88,6 +98,11 @@ werkzeug                                 2.1.2                2.2.2
 - Lint code
 ```
 $ make lint
+```
+
+Run Unit Tests
+```
+$ make test
 ```
 
 - Build docker image

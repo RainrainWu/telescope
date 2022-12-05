@@ -1,6 +1,7 @@
 package telescope
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"regexp"
@@ -46,6 +47,15 @@ type PoetryLock struct {
 	Packages []PoetryLockPackage `toml:"package"`
 }
 
+type PipfileLockPackage struct {
+	Version string `json:"version"`
+}
+
+type PipfileLock struct {
+	Default map[string]PipfileLockPackage `json:"default"`
+	Develop map[string]PipfileLockPackage `json:"develop"`
+}
+
 func NewAtlas(
 	filePath string,
 	strictSemVer bool,
@@ -70,6 +80,8 @@ func NewAtlas(
 		atlas = buildAtlasGoMod(fileBytes, strictSemVer, ignoredPatterns, criticalPatterns)
 	case "poetry.lock":
 		atlas = buildAtlasPoetryLock(fileBytes, strictSemVer, ignoredPatterns, criticalPatterns)
+	case "pipfile.lock":
+		atlas = buildAtlasPipfileLock(fileBytes, strictSemVer, ignoredPatterns, criticalPatterns)
 	default:
 		panic(fmt.Errorf("unknown dep file: %s", filePath))
 	}
@@ -171,6 +183,39 @@ func buildAtlasPoetryLock(
 		atlas.appendDependency(
 			NewDependency(pkg.Name, pkg.Version, strictSemVer),
 		)
+	}
+	return &atlas
+}
+
+func buildAtlasPipfileLock(
+	fileBytes []byte,
+	strictSemVer bool,
+	ignoredPatterns []*regexp.Regexp,
+	criticalPatterns map[OutdatedScope][]*regexp.Regexp,
+) IReportable {
+
+	var pipfileLock PipfileLock
+	err := json.Unmarshal(fileBytes, &pipfileLock)
+	if err != nil {
+		panic(err)
+	}
+
+	atlas := Atlas{
+		name:         "",
+		language:     PYTHON,
+		dependencies: []IDependable{},
+		criticalMap:  criticalPatterns,
+		outdatedMap:  map[OutdatedScope][]IDependable{},
+	}
+	for _, pkgGroup := range []map[string]PipfileLockPackage{pipfileLock.Default, pipfileLock.Develop} {
+		for name, pkg := range pkgGroup {
+			if matchRegExpPatterns(ignoredPatterns, name) {
+				continue
+			}
+			atlas.appendDependency(
+				NewDependency(name, pkg.Version[2:], strictSemVer),
+			)
+		}
 	}
 	return &atlas
 }
