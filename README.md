@@ -42,7 +42,7 @@ docker run \
     --rm \
     -v "$YOUR_GO_MOD_FILE:/go.mod" \
     docker.io/r41nwu/telescope:latest \
-    telescope -f "go.mod" -s "major"
+    telescope -f "go.mod" -s "minor" -c "major:.*"
 ```
 
 - With `poetry.lock` file
@@ -51,7 +51,7 @@ docker run \
     --rm \
     -v "$YOUR_POETRY_LOCK_FILE:/poetry.lock" \
     docker.io/r41nwu/telescope:latest \
-    telescope -f "poetry.lock" -s "minor"
+    telescope -f "poetry.lock" -s "minor" -c "major:.*"
 ```
 
 - With `Pipfile.lock` file
@@ -60,7 +60,50 @@ docker run \
     --rm \
     -v "$YOUR_PIPFILE_LOCK_FILE:/Pipfile.lock" \
     docker.io/r41nwu/telescope:latest \
-    telescope -f "Pipfile.lock" -s "minor"
+    telescope -f "Pipfile.lock" -s "minor" -c "major:.*"
+```
+
+### Advanced Flags Usage
+
+#### Desired Scope `-s`
+Specify the scope you want while reporting outdated dependencies.
+```
+// report dependencies with outdated version on major scope only
+telescope -s "major"
+
+// report dependencies with outdated version on any of major, minor, or patch scope
+telescope -s "patch"
+```
+
+#### Critical Dependencies `-c`
+Return a non-zero exit code if any of the matched dependencies is outdated (dependencies will start with a `*` prefix).
+```
+// raise error if there is any dependency outdated on major version
+telescope -c "major:.*"
+
+// raise error if any dependency from `golang.org` or `k8s.io` has a outdated scope greater than minor version
+telescope -c "minor:^golang.org/.*$" -c "minor:^k8s.io/.*$"
+```
+
+#### Ignored Dependencies `-i`
+Ignored dependencies will not be taken into account during reporting.
+```
+// ignore all pytest-related packages
+telescope -i "^pytest.*$"
+```
+
+#### Skip Dependencies with Unknown Version
+Skip dependency if its current version can not be parsed or unable to obtained the latest version from package index url.
+```
+// skip dependencies with unknown version
+telescope --skip-unknown
+```
+
+#### Strict Semantic Version
+By default telescope will tend to truncated useless information (e.g. alpha/beta release tag) and parse as many version expressions as possible, but you are still able to force apply strict semver format and the malformed expression will be treated as unknown one.
+```
+// force apply strict semantic version format
+telescope --strict-semver
 ```
 
 ### Example Output
