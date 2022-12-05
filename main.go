@@ -87,8 +87,8 @@ func init() {
 	flag.StringVar(&outdatedScope, "s", "major", "desired outdated scope")
 	flag.BoolVar(&skipUnknown, "skip-unknown", false, "skip dependencies with unknown versions")
 	flag.BoolVar(&strictSemVer, "strict-semver", false, "parse dependencies file with strict SemVer format")
-	flag.Var(&ignoredExpressions, "i", "ignore specific dependency")
-	flag.Var(&criticalExpressions, "c", "highlight critical dependency")
+	flag.Var(&ignoredExpressions, "i", "ignore specific dependencies with regular expression")
+	flag.Var(&criticalExpressions, "c", "highlight critical dependencies with regular expression")
 	flag.Usage = usage
 }
 
