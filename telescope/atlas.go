@@ -3,6 +3,7 @@ package telescope
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -30,7 +31,7 @@ type IReportable interface {
 type Atlas struct {
 	name         string
 	language     Language
-	criticalMap  map[string]OutdatedScope
+	criticalMap  map[OutdatedScope][]*regexp.Regexp
 	dependencies []IDependable
 	outdatedMap  map[OutdatedScope][]IDependable
 }
@@ -48,8 +49,8 @@ type PoetryLock struct {
 func NewAtlas(
 	filePath string,
 	strictSemVer bool,
-	ignoredDeps map[string]bool,
-	criticalDeps map[string]OutdatedScope,
+	ignoredExpressions []string,
+	criticalExpressions map[OutdatedScope][]string,
 ) IReportable {
 
 	var atlas IReportable
@@ -58,14 +59,21 @@ func NewAtlas(
 	splitPath := strings.Split(filePath, "/")
 	fileName := splitPath[len(splitPath)-1]
 
+	ignoredPatterns := compileRegExpRules(ignoredExpressions)
+	criticalPatterns := make(map[OutdatedScope][]*regexp.Regexp)
+	for scope, exprs := range criticalExpressions {
+		criticalPatterns[scope] = compileRegExpRules(exprs)
+	}
+
 	switch fileName {
 	case "go.mod":
-		atlas = buildAtlasGoMod(fileBytes, strictSemVer, ignoredDeps, criticalDeps)
+		atlas = buildAtlasGoMod(fileBytes, strictSemVer, ignoredPatterns, criticalPatterns)
 	case "poetry.lock":
-		atlas = buildAtlasPoetryLock(fileBytes, strictSemVer, ignoredDeps, criticalDeps)
+		atlas = buildAtlasPoetryLock(fileBytes, strictSemVer, ignoredPatterns, criticalPatterns)
 	default:
 		panic(fmt.Errorf("unknown dep file: %s", filePath))
 	}
+
 	atlas.(*Atlas).sortLexicographically()
 	atlas.(*Atlas).queryVersionsInformation()
 	atlas.(*Atlas).buildOutdatedMap()
@@ -83,7 +91,36 @@ func parseDependenciesFile(filePath string) []byte {
 	return fileBytes
 }
 
-func buildAtlasGoMod(fileBytes []byte, strictSemVer bool, ignoredDeps map[string]bool, criticalDeps map[string]OutdatedScope) IReportable {
+func compileRegExpRules(regExpStrings []string) []*regexp.Regexp {
+
+	patterns := []*regexp.Regexp{}
+	for _, regExpString := range regExpStrings {
+		pattern, err := regexp.Compile(regExpString)
+		if err != nil {
+			panic(err)
+		}
+		patterns = append(patterns, pattern)
+	}
+
+	return patterns
+}
+
+func matchRegExpPatterns(patterns []*regexp.Regexp, payload string) bool {
+
+	for _, pattern := range patterns {
+		if idx := pattern.FindStringIndex(payload); idx != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func buildAtlasGoMod(
+	fileBytes []byte,
+	strictSemVer bool,
+	ignoredPatterns []*regexp.Regexp,
+	criticalPatterns map[OutdatedScope][]*regexp.Regexp,
+) IReportable {
 
 	modObject, err := modfile.Parse("go.mod", fileBytes, nil)
 	if err != nil {
@@ -93,11 +130,11 @@ func buildAtlasGoMod(fileBytes []byte, strictSemVer bool, ignoredDeps map[string
 	atlas := Atlas{
 		name:         modObject.Module.Mod.Path,
 		language:     GO,
-		criticalMap:  criticalDeps,
+		criticalMap:  criticalPatterns,
 		dependencies: []IDependable{},
 	}
 	for _, require := range modObject.Require {
-		if _, ok := ignoredDeps[require.Mod.Path]; ok {
+		if matchRegExpPatterns(ignoredPatterns, require.Mod.Path) {
 			continue
 		}
 		atlas.appendDependency(
@@ -107,7 +144,12 @@ func buildAtlasGoMod(fileBytes []byte, strictSemVer bool, ignoredDeps map[string
 	return &atlas
 }
 
-func buildAtlasPoetryLock(fileBytes []byte, strictSemVer bool, ignoredDeps map[string]bool, criticalDeps map[string]OutdatedScope) IReportable {
+func buildAtlasPoetryLock(
+	fileBytes []byte,
+	strictSemVer bool,
+	ignoredPatterns []*regexp.Regexp,
+	criticalPatterns map[OutdatedScope][]*regexp.Regexp,
+) IReportable {
 
 	var poetryLock PoetryLock
 	err := toml.Unmarshal(fileBytes, &poetryLock)
@@ -119,11 +161,11 @@ func buildAtlasPoetryLock(fileBytes []byte, strictSemVer bool, ignoredDeps map[s
 		name:         "",
 		language:     PYTHON,
 		dependencies: []IDependable{},
-		criticalMap:  criticalDeps,
+		criticalMap:  criticalPatterns,
 		outdatedMap:  map[OutdatedScope][]IDependable{},
 	}
 	for _, pkg := range poetryLock.Packages {
-		if _, ok := ignoredDeps[pkg.Name]; ok {
+		if matchRegExpPatterns(ignoredPatterns, pkg.Name) {
 			continue
 		}
 		atlas.appendDependency(
@@ -219,11 +261,6 @@ func buildReportItem(dep IDependable) string {
 
 func (a *Atlas) reportByScope(scope OutdatedScope, color int) bool {
 
-	var criticalFound, criticalAnyway bool
-	if scp, ok := a.criticalMap["*"]; ok {
-		criticalAnyway = scp >= scope
-	}
-
 	fmt.Printf(
 		"\033[%dm\n[ %d %s Version Outdated ]%s\n\n",
 		color,
@@ -235,10 +272,18 @@ func (a *Atlas) reportByScope(scope OutdatedScope, color int) bool {
 		fmt.Printf("no outdated dependencies")
 	}
 
+	var criticalFound bool = false
 	for _, dep := range a.outdatedMap[scope] {
 
-		scp, ok := a.criticalMap[dep.(*Dependency).Name]
-		if criticalAnyway || (ok && scp >= scope) {
+		var patternHit bool = false
+		for scp, patterns := range a.criticalMap {
+			if scp < scope {
+				continue
+			}
+			patternHit = patternHit || matchRegExpPatterns(patterns, dep.(*Dependency).Name)
+		}
+
+		if patternHit {
 			criticalFound = criticalFound || true
 			fmt.Printf("* %s\n", buildReportItem(dep))
 		} else {
