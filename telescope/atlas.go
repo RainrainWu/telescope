@@ -80,7 +80,7 @@ func NewAtlas(
 		atlas = buildAtlasGoMod(fileBytes, strictSemVer, ignoredPatterns, criticalPatterns)
 	case "poetry.lock":
 		atlas = buildAtlasPoetryLock(fileBytes, strictSemVer, ignoredPatterns, criticalPatterns)
-	case "pipfile.lock":
+	case "Pipfile.lock":
 		atlas = buildAtlasPipfileLock(fileBytes, strictSemVer, ignoredPatterns, criticalPatterns)
 	default:
 		panic(fmt.Errorf("unknown dep file: %s", filePath))
