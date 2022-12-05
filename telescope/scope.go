@@ -16,6 +16,7 @@ const (
 	UNKNOWN
 )
 
+var OutdatedScopeSeries [5]OutdatedScope = [...]OutdatedScope{UP_TO_DATE, MAJOR, MINOR, PATCH, UNKNOWN}
 var OutdatedScopeLiteral [5]string = [...]string{"UP_TO_DATE", "MAJOR", "MINOR", "PATCH", "UNKNOWN"}
 
 var MapScopeColor map[OutdatedScope]int = map[OutdatedScope]int{

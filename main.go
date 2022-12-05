@@ -8,67 +8,77 @@ import (
 	"telescope/telescope"
 )
 
-type IgnoredDependencies map[string]bool
+type IgnoredExpressions map[string]bool
 
-func (i *IgnoredDependencies) String() string {
+func (i *IgnoredExpressions) String() string {
+
+	return fmt.Sprintln(i.ToSlice())
+}
+
+func (i *IgnoredExpressions) Set(value string) error {
+
+	(*i)[value] = true
+	return nil
+}
+
+func (i *IgnoredExpressions) ToSlice() []string {
 
 	var ignored []string
 	for dep := range *i {
 		ignored = append(ignored, dep)
 	}
-	return fmt.Sprintln(ignored)
+	return ignored
 }
 
-func (i *IgnoredDependencies) Set(value string) error {
+type CriticalExpressions map[string]telescope.OutdatedScope
 
-	map[string]bool(*i)[value] = true
-	return nil
-}
-
-type CriticalDependencies map[string]telescope.OutdatedScope
-
-func (c *CriticalDependencies) String() string {
+func (c *CriticalExpressions) String() string {
 
 	var buffer string
-	for dep, scp := range map[string]telescope.OutdatedScope(*c) {
+	criticalMap := c.ToScopeMap()
+	for _, scp := range telescope.OutdatedScopeSeries {
 
-		buffer += fmt.Sprintf("[ %s ] %s\n", scp, dep)
+		buffer += fmt.Sprintf("[ %s ]\n%s\n", scp, criticalMap[scp])
 	}
 	return buffer
 }
 
-func (c *CriticalDependencies) Set(value string) error {
+func (c *CriticalExpressions) Set(value string) error {
 
-	var depName string
-	var desiredScope telescope.OutdatedScope
-
-	result := strings.Split(value, ":")
-	c_deps := map[string]telescope.OutdatedScope(*c)
-	if len(result) == 2 {
-		depName, desiredScope = result[1], telescope.OutdatedScopeStrToEnum(result[0])
-	} else if len(result) == 1 {
-		depName, desiredScope = result[0], telescope.MAJOR
-	} else {
-		panic(fmt.Errorf("invalid expression: %s", value))
+	desiredScopeStr, expression, found := strings.Cut(value, ":")
+	expressionMap := map[string]telescope.OutdatedScope(*c)
+	if !found {
+		desiredScopeStr, expression = telescope.MAJOR.String(), desiredScopeStr
 	}
 
-	if registeredScope, ok := c_deps[depName]; ok {
-		c_deps[depName] = telescope.GetTopScope(
+	desiredScope := telescope.OutdatedScopeStrToEnum(desiredScopeStr)
+	if registeredScope, ok := expressionMap[expression]; ok {
+		expressionMap[expression] = telescope.GetTopScope(
 			[]telescope.OutdatedScope{registeredScope, desiredScope},
 		)
 	} else {
-		c_deps[depName] = desiredScope
+		expressionMap[expression] = desiredScope
 	}
 	return nil
 }
 
+func (c *CriticalExpressions) ToScopeMap() map[telescope.OutdatedScope][]string {
+
+	var criticalMap map[telescope.OutdatedScope][]string = map[telescope.OutdatedScope][]string{}
+	for dep, scp := range *c {
+
+		criticalMap[scp] = append(criticalMap[scp], dep)
+	}
+	return criticalMap
+}
+
 var (
-	filePath             string
-	outdatedScope        string
-	skipUnknown          bool
-	strictSemVer         bool
-	ignoredDependencies  IgnoredDependencies  = make(map[string]bool)
-	criticalDependencies CriticalDependencies = make(map[string]telescope.OutdatedScope)
+	filePath            string
+	outdatedScope       string
+	skipUnknown         bool
+	strictSemVer        bool
+	ignoredExpressions  IgnoredExpressions  = make(map[string]bool)
+	criticalExpressions CriticalExpressions = make(map[string]telescope.OutdatedScope)
 )
 
 func init() {
@@ -77,8 +87,8 @@ func init() {
 	flag.StringVar(&outdatedScope, "s", "major", "desired outdated scope")
 	flag.BoolVar(&skipUnknown, "skip-unknown", false, "skip dependencies with unknown versions")
 	flag.BoolVar(&strictSemVer, "strict-semver", false, "parse dependencies file with strict SemVer format")
-	flag.Var(&ignoredDependencies, "i", "ignore specific dependency")
-	flag.Var(&criticalDependencies, "c", "highlight critical dependency")
+	flag.Var(&ignoredExpressions, "i", "ignore specific dependency")
+	flag.Var(&criticalExpressions, "c", "highlight critical dependency")
 	flag.Usage = usage
 }
 
@@ -92,7 +102,7 @@ func main() {
 
 	flag.Parse()
 
-	atlas := telescope.NewAtlas(filePath, strictSemVer, ignoredDependencies, criticalDependencies)
+	atlas := telescope.NewAtlas(filePath, strictSemVer, ignoredExpressions.ToSlice(), criticalExpressions.ToScopeMap())
 	criticalFound := atlas.ReportOutdated(
 		telescope.OutdatedScopeStrToEnum(outdatedScope),
 		skipUnknown,
