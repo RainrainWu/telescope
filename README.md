@@ -65,7 +65,7 @@ docker run \
 
 ### Advanced Flags Usage
 
-#### Desired Scope `-s`
+#### `-s` Desired Scope
 Specify the scope you want while reporting outdated dependencies.
 ```
 // report dependencies with outdated version on major scope only
@@ -75,7 +75,7 @@ telescope -s "major"
 telescope -s "patch"
 ```
 
-#### Critical Dependencies `-c`
+#### `-c` Critical Dependencies
 Return a non-zero exit code if any of the matched dependencies is outdated (dependencies will start with a `*` prefix).
 ```
 // raise error if there is any dependency outdated on major version
@@ -85,21 +85,21 @@ telescope -c "major:.*"
 telescope -c "minor:^golang.org/.*$" -c "minor:^k8s.io/.*$"
 ```
 
-#### Ignored Dependencies `-i`
+#### `-i` Ignored Dependencies
 Ignored dependencies will not be taken into account during reporting.
 ```
 // ignore all pytest-related packages
 telescope -i "^pytest.*$"
 ```
 
-#### Skip Dependencies with Unknown Version
+#### `--skip-unknown` Skip Dependencies with Unknown Version
 Skip dependency if its current version can not be parsed or unable to obtained the latest version from package index url.
 ```
 // skip dependencies with unknown version
 telescope --skip-unknown
 ```
 
-#### Strict Semantic Version
+#### `-strict-semver` Strict Semantic Version
 By default telescope will tend to truncated useless information (e.g. alpha/beta release tag) and parse as many version expressions as possible, but you are still able to force apply strict semver format and the malformed expression will be treated as unknown one.
 ```
 // force apply strict semantic version format
