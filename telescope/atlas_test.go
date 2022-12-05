@@ -14,10 +14,10 @@ type SuiteAtlas struct {
 
 func TestCompileRegExpRules(t *testing.T) {
 
-	params := []struct{
-		name string
+	params := []struct {
+		name        string
 		expressions []string
-		expected int
+		expected    int
 	}{
 		{name: "empty", expressions: []string{}, expected: 0},
 		{name: "single expression", expressions: []string{"^github.com/.*$"}, expected: 1},
@@ -39,9 +39,9 @@ func TestCompileRegExpRules(t *testing.T) {
 func TestMatchRegExpPatterns(t *testing.T) {
 
 	patterns := compileRegExpRules([]string{"^github.com/.*$", "^k8s.io/.*$"})
-	params := []struct{
-		name string
-		payload string
+	params := []struct {
+		name     string
+		payload  string
 		expected bool
 	}{
 		{name: "not hit", payload: "gotest.tools/v3", expected: false},

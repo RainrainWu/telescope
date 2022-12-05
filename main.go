@@ -24,7 +24,7 @@ func (i *IgnoredExpressions) Set(value string) error {
 func (i *IgnoredExpressions) ToSlice() []string {
 
 	var ignored []string
-	for dep, _ := range *i {
+	for dep := range *i {
 		ignored = append(ignored, dep)
 	}
 	return ignored
@@ -73,10 +73,10 @@ func (c *CriticalExpressions) ToScopeMap() map[telescope.OutdatedScope][]string 
 }
 
 var (
-	filePath             string
-	outdatedScope        string
-	skipUnknown          bool
-	strictSemVer         bool
+	filePath            string
+	outdatedScope       string
+	skipUnknown         bool
+	strictSemVer        bool
 	ignoredExpressions  IgnoredExpressions  = make(map[string]bool)
 	criticalExpressions CriticalExpressions = make(map[string]telescope.OutdatedScope)
 )
