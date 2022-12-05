@@ -9,11 +9,20 @@ on:
 jobs:
 
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: [1.19]
+        os: [macos-latest]
+
+    runs-on: ${{ matrix.os }}
     steps:
 
     - name: Checkout branch
       uses: actions/checkout@v3
+
+    - uses: actions/setup-go@v3
+      with:
+        go-version: ${{ matrix.go }}
 
     - name: Lint
       uses: golangci/golangci-lint-action@v3.3.1
