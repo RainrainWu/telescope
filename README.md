@@ -118,7 +118,7 @@ telescope --strict-semver
   k8s.io/client-go                                   0.25.3               11.0.0+incompatible 
 
 
-[ 47 MINOR Version Outdated ]========================================
+[ 15 MINOR Version Outdated ]========================================
 
   cloud.google.com/go/compute                        1.12.1               1.14.0              
   github.com/Microsoft/go-winio                      0.5.1                0.6.0               
