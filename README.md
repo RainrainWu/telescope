@@ -99,7 +99,7 @@ Skip dependency if its current version can not be parsed or unable to obtained t
 telescope --skip-unknown
 ```
 
-#### `-strict-semver` Strict Semantic Version
+#### `--strict-semver` Strict Semantic Version
 By default telescope will tend to truncated useless information (e.g. alpha/beta release tag) and parse as many version expressions as possible, but you are still able to force apply strict semver format and the malformed expression will be treated as unknown one.
 ```
 // force apply strict semantic version format
@@ -108,33 +108,33 @@ telescope --strict-semver
 
 ### Example Output
 ```
-[MAJOR Version Outdated]====================
-charset-normalizer                       2.1.1                3.0.1
-cryptography                             37.0.4               38.0.4
-executing                                0.10.0               1.2.0
-moto                                     3.1.18               4.0.10
-protobuf                                 3.20.3               4.21.9
-pymongo                                  3.13.0               4.3.3
-pytest-cov                               3.0.0                4.0.0
-pytest-xdist                             2.5.0                3.0.2
-rfc3986                                  1.5.0                2.0.0
+[ 6 MAJOR Version Outdated ]========================================
+
+  github.com/Azure/azure-sdk-for-go                  65.0.0+incompatible  67.1.0+incompatible 
+  github.com/docker/docker                           20.10.21+incompatible 23.0.0-beta.1+incompatible
+  github.com/evanphx/json-patch                      4.12.0+incompatible  5.6.0+incompatible  
+* github.com/hashicorp/go-hclog                      0.14.1               1.4.0               
+* github.com/hashicorp/golang-lru                    0.5.4                1.0.1               
+  k8s.io/client-go                                   0.25.3               11.0.0+incompatible 
 
 
-[MINOR Version Outdated]====================
-devtools                                 0.8.0                0.10.0
-fastapi                                  0.78.0               0.88.0
-googleapis-common-protos                 1.56.2               1.57.0
-grpcio                                   1.50.0               1.51.0
-h11                                      0.12.0               0.14.0
-httpcore                                 0.15.0               0.16.2
-hypothesis                               6.57.1               6.58.1
-prometheus-client                        0.14.1               0.15.0
-pytest-asyncio                           0.18.3               0.20.2
-setuptools                               65.5.1               65.6.3
-starlette                                0.19.1               0.22.0
-uvicorn                                  0.17.6               0.20.0
-virtualenv                               20.16.7              20.17.0
-werkzeug                                 2.1.2                2.2.2
+[ 47 MINOR Version Outdated ]========================================
+
+  cloud.google.com/go/compute                        1.12.1               1.14.0              
+  github.com/Microsoft/go-winio                      0.5.1                0.6.0               
+  github.com/PuerkitoBio/purell                      1.1.1                1.2.0               
+  github.com/armon/go-metrics                        0.3.10               0.4.1               
+  github.com/cenkalti/backoff/v4                     4.1.3                4.2.0               
+  github.com/cespare/xxhash/v2                       2.1.2                2.2.0               
+  github.com/coreos/go-systemd/v22                   22.4.0               22.5.0              
+  github.com/digitalocean/godo                       1.89.0               1.91.1              
+  github.com/docker/distribution                     2.7.1+incompatible   2.8.1+incompatible  
+  github.com/emicklei/go-restful/v3                  3.8.0                3.10.1              
+  github.com/envoyproxy/protoc-gen-validate          0.8.0                0.10.0-SNAPSHOT.0   
+  github.com/go-kit/kit                              0.10.0               0.12.0              
+  github.com/go-openapi/jsonreference                0.19.6               0.20.0              
+  github.com/go-openapi/swag                         0.21.1               0.22.3              
+  github.com/go-openapi/validate                     0.21.0               0.22.0
 ```
 
 ## Development
