@@ -322,7 +322,7 @@ func (a *Atlas) reportByScope(scope OutdatedScope, color int) bool {
 
 		var patternHit bool = false
 		for scp, patterns := range a.criticalMap {
-			if scp < scope {
+			if scp != scope {
 				continue
 			}
 			patternHit = patternHit || matchRegExpPatterns(patterns, dep.(*Dependency).Name)
